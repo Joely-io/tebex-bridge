@@ -2,8 +2,7 @@ import { Hono } from 'hono'
 import { config } from '../config.js'
 import { proxyToTebex } from '../utils/proxy.js'
 import { sanitizeUserLookup } from '../utils/sanitize.js'
-
-const TEBEX_PLUGIN_API_BASE = 'https://plugin.tebex.io'
+import { TEBEX_PLUGIN_API_BASE, pluginHeaders as buildPluginHeaders } from '../utils/tebex.js'
 
 /**
  * Plugin API routes (https://docs.tebex.io/plugin)
@@ -28,10 +27,7 @@ plugin.use('*', async (c, next) => {
 })
 
 function pluginHeaders(): Record<string, string> {
-  return {
-    'X-Tebex-Secret': config.secretKey!,
-    'Content-Type': 'application/json',
-  }
+  return buildPluginHeaders(config.secretKey!)
 }
 
 // GET /v1/plugin/information — store info

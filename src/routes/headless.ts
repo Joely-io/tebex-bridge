@@ -1,8 +1,7 @@
 import { Hono } from 'hono'
 import { config } from '../config.js'
 import { proxyToTebex } from '../utils/proxy.js'
-
-const TEBEX_HEADLESS_API_BASE = 'https://headless.tebex.io/api'
+import { headlessAccountBase } from '../utils/tebex.js'
 
 /**
  * Headless API routes (https://docs.tebex.io/developers)
@@ -14,7 +13,7 @@ const TEBEX_HEADLESS_API_BASE = 'https://headless.tebex.io/api'
 export const headless = new Hono()
 
 function accountBase(): string {
-  return `${TEBEX_HEADLESS_API_BASE}/accounts/${encodeURIComponent(config.webstoreToken)}`
+  return headlessAccountBase(config.webstoreToken)
 }
 
 // GET /v1/headless/accounts — store info

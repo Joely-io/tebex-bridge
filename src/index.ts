@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { config } from './config.js'
+import { runKeyChecks } from './utils/keycheck.js'
 import { hmacAuth } from './middleware/hmac.js'
 import { plugin } from './routes/plugin.js'
 import { headless } from './routes/headless.js'
@@ -43,4 +44,5 @@ serve({ fetch: app.fetch, port: config.port }, (info) => {
   console.log(`Plugin API:   ${config.secretKey ? 'enabled' : 'disabled (no TEBEX_SECRET_KEY)'}`)
   console.log(`Headless API: enabled`)
   console.log(`Checkout API: ${config.privateKey ? 'enabled' : 'disabled (no TEBEX_PRIVATE_KEY)'}`)
+  void runKeyChecks(config)
 })

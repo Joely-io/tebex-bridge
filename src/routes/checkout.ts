@@ -2,8 +2,11 @@ import { Hono } from 'hono'
 import { config } from '../config.js'
 import { proxyToTebex } from '../utils/proxy.js'
 import { sanitizePayment } from '../utils/sanitize.js'
-
-const TEBEX_CHECKOUT_API_BASE = 'https://checkout.tebex.io/api'
+import {
+  TEBEX_CHECKOUT_API_BASE,
+  TEBEX_CHECKOUT_VALIDATION_URL,
+  checkoutHeaders as buildCheckoutHeaders,
+} from '../utils/tebex.js'
 
 /**
  * Checkout API routes (https://docs.tebex.io/developers)
@@ -28,11 +31,7 @@ checkout.use('*', async (c, next) => {
 })
 
 function checkoutHeaders(): Record<string, string> {
-  const credentials = Buffer.from(`${config.storeId}:${config.privateKey}`).toString('base64')
-  return {
-    Authorization: `Basic ${credentials}`,
-    Accept: '*/*',
-  }
+  return buildCheckoutHeaders(config.storeId!, config.privateKey!)
 }
 
 // GET /v1/checkout/payments/:txnId[?type=txn_id] — payment details (PII stripped)
@@ -53,7 +52,7 @@ checkout.get('/payments/:txnId', (c) => {
 // Proxies Tebex's validation trick: a 404 on a fictitious payment means the
 // credentials are valid; 401/403/500 means they are not.
 checkout.get('/validate', (c) =>
-  proxyToTebex(c, `${TEBEX_CHECKOUT_API_BASE}/payments/tbx-validation-test?type=txn_id`, {
+  proxyToTebex(c, TEBEX_CHECKOUT_VALIDATION_URL, {
     headers: checkoutHeaders(),
   })
 )

@@ -17,9 +17,9 @@ export const plugin = new Hono()
 
 /** Reject Plugin API calls when no secret key is configured on this bridge */
 plugin.use('*', async (c, next) => {
-  if (!config.secretKey) {
+  if (!config.gameServerSecretKey) {
     return c.json(
-      { error: 'NOT_CONFIGURED', message: 'TEBEX_SECRET_KEY is not set on this bridge' },
+      { error: 'NOT_CONFIGURED', message: 'TEBEX_GAME_SERVER_SECRET_KEY is not set on this bridge' },
       503
     )
   }
@@ -27,7 +27,7 @@ plugin.use('*', async (c, next) => {
 })
 
 function pluginHeaders(): Record<string, string> {
-  return buildPluginHeaders(config.secretKey!)
+  return buildPluginHeaders(config.gameServerSecretKey!)
 }
 
 // GET /v1/plugin/information — store info

@@ -10,7 +10,8 @@ import {
 
 /**
  * Checkout API routes (https://docs.tebex.io/developers)
- * Auth: HTTP Basic ({storeId}:{privateKey}), injected from the bridge's own env.
+ * Auth: HTTP Basic ({storeId}:{privateKey}) — the private key comes from the
+ * bridge's own env, the store ID is resolved from the Headless API at startup.
  *
  * Used by Joely for: transaction/payment details, credential validation.
  * Payment responses are sanitized: the customer object is reduced to the
@@ -21,9 +22,18 @@ export const checkout = new Hono()
 
 /** Reject Checkout API calls when credentials are not configured on this bridge */
 checkout.use('*', async (c, next) => {
-  if (!config.storeId || !config.privateKey) {
+  if (!config.privateKey) {
     return c.json(
-      { error: 'NOT_CONFIGURED', message: 'TEBEX_STORE_ID / TEBEX_PRIVATE_KEY are not set on this bridge' },
+      { error: 'NOT_CONFIGURED', message: 'TEBEX_PRIVATE_KEY is not set on this bridge' },
+      503
+    )
+  }
+  if (!config.storeId) {
+    return c.json(
+      {
+        error: 'NOT_CONFIGURED',
+        message: 'Store ID could not be resolved from the Headless API at startup — restart the bridge',
+      },
       503
     )
   }

@@ -24,7 +24,21 @@ export function checkoutHeaders(storeId: string, privateKey: string): Record<str
   }
 }
 
-/** Headless API account base URL (webstore token lives in the path) */
-export function headlessAccountBase(webstoreToken: string): string {
-  return `${TEBEX_HEADLESS_API_BASE}/accounts/${encodeURIComponent(webstoreToken)}`
+/** Headless API account base URL (public key lives in the path) */
+export function headlessAccountBase(publicKey: string): string {
+  return `${TEBEX_HEADLESS_API_BASE}/accounts/${encodeURIComponent(publicKey)}`
+}
+
+/** Resolve the store ID (Checkout Basic-auth username) from the Headless API account lookup */
+export async function resolveStoreId(publicKey: string): Promise<string | null> {
+  try {
+    const response = await fetch(headlessAccountBase(publicKey), {
+      signal: AbortSignal.timeout(10_000),
+    })
+    if (!response.ok) return null
+    const body = (await response.json()) as { data?: { id?: number | string } }
+    return body.data?.id != null ? String(body.data.id) : null
+  } catch {
+    return null
+  }
 }

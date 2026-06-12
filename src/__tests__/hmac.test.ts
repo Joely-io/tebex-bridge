@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-process.env.TEBEX_WEBSTORE_TOKEN = 'test-webstore-token'
+process.env.TEBEX_PUBLIC_KEY = 'test-public-key'
 process.env.JOELY_SHARED_SECRET = 'a'.repeat(64)
 
 const { computeSignature, hmacAuth } = await import('../middleware/hmac.js')

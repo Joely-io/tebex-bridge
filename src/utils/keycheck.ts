@@ -20,9 +20,9 @@ async function probeStatus(url: string, headers?: Record<string, string>): Promi
   }
 }
 
-/** Public key (Headless webstore token): the account lookup returns 200 when valid */
-export async function checkWebstoreToken(config: BridgeConfig): Promise<KeyStatus> {
-  const status = await probeStatus(headlessAccountBase(config.webstoreToken))
+/** Public key (Headless API): the account lookup returns 200 when valid */
+export async function checkPublicKey(config: BridgeConfig): Promise<KeyStatus> {
+  const status = await probeStatus(headlessAccountBase(config.publicKey))
   if (status === null) return 'unreachable'
   return status === 200 ? 'valid' : 'invalid'
 }
@@ -32,7 +32,9 @@ export async function checkWebstoreToken(config: BridgeConfig): Promise<KeyStatu
  * fictitious payment means the credentials are valid, 401/403 means not.
  */
 export async function checkCheckoutKeys(config: BridgeConfig): Promise<KeyStatus> {
-  if (!config.storeId || !config.privateKey) return 'not_configured'
+  if (!config.privateKey) return 'not_configured'
+  // Store ID resolution from the Headless API failed at startup
+  if (!config.storeId) return 'unreachable'
   const status = await probeStatus(
     TEBEX_CHECKOUT_VALIDATION_URL,
     checkoutHeaders(config.storeId, config.privateKey)
@@ -42,11 +44,11 @@ export async function checkCheckoutKeys(config: BridgeConfig): Promise<KeyStatus
 }
 
 /** Game server key (Plugin API secret): /information returns 200 when valid */
-export async function checkSecretKey(config: BridgeConfig): Promise<KeyStatus> {
-  if (!config.secretKey) return 'not_configured'
+export async function checkGameServerSecretKey(config: BridgeConfig): Promise<KeyStatus> {
+  if (!config.gameServerSecretKey) return 'not_configured'
   const status = await probeStatus(
     `${TEBEX_PLUGIN_API_BASE}/information`,
-    pluginHeaders(config.secretKey)
+    pluginHeaders(config.gameServerSecretKey)
   )
   if (status === null) return 'unreachable'
   return status === 200 ? 'valid' : 'invalid'
@@ -61,14 +63,14 @@ const STATUS_LABELS: Record<KeyStatus, string> = {
 
 /** Verify every configured key against the Tebex API and log one line per key */
 export async function runKeyChecks(config: BridgeConfig): Promise<void> {
-  const [webstoreToken, checkoutKeys, secretKey] = await Promise.all([
-    checkWebstoreToken(config),
+  const [publicKey, checkoutKeys, gameServerSecretKey] = await Promise.all([
+    checkPublicKey(config),
     checkCheckoutKeys(config),
-    checkSecretKey(config),
+    checkGameServerSecretKey(config),
   ])
 
   console.log('Tebex key check:')
-  console.log(`  Public key (TEBEX_WEBSTORE_TOKEN):                ${STATUS_LABELS[webstoreToken]}`)
-  console.log(`  Private key (TEBEX_STORE_ID + TEBEX_PRIVATE_KEY): ${STATUS_LABELS[checkoutKeys]}`)
-  console.log(`  Game server key (TEBEX_SECRET_KEY):               ${STATUS_LABELS[secretKey]}`)
+  console.log(`  Public key (TEBEX_PUBLIC_KEY):                  ${STATUS_LABELS[publicKey]}`)
+  console.log(`  Private key (TEBEX_PRIVATE_KEY):                ${STATUS_LABELS[checkoutKeys]}`)
+  console.log(`  Game server key (TEBEX_GAME_SERVER_SECRET_KEY): ${STATUS_LABELS[gameServerSecretKey]}`)
 }

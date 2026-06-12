@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { config } from './config.js'
+import { resolveStoreId } from './utils/tebex.js'
 import { runKeyChecks } from './utils/keycheck.js'
 import { hmacAuth } from './middleware/hmac.js'
 import { plugin } from './routes/plugin.js'
@@ -39,10 +40,29 @@ app.route('/v1/plugin', plugin)
 app.route('/v1/headless', headless)
 app.route('/v1/checkout', checkout)
 
+// Checkout Basic auth needs the store ID — resolved from the Headless API
+// account lookup at startup so it never has to be configured by hand.
+if (config.privateKey) {
+  config.storeId = await resolveStoreId(config.publicKey)
+  if (!config.storeId) {
+    console.error(
+      'Could not resolve the store ID from the Headless API (check TEBEX_PUBLIC_KEY) — Checkout routes are disabled until restart'
+    )
+  }
+}
+
 serve({ fetch: app.fetch, port: config.port }, (info) => {
   console.log(`Tebex Bridge v${pkg.version} listening on port ${info.port}`)
-  console.log(`Plugin API:   ${config.secretKey ? 'enabled' : 'disabled (no TEBEX_SECRET_KEY)'}`)
+  console.log(`Plugin API:   ${config.gameServerSecretKey ? 'enabled' : 'disabled (no TEBEX_GAME_SERVER_SECRET_KEY)'}`)
   console.log(`Headless API: enabled`)
-  console.log(`Checkout API: ${config.privateKey ? 'enabled' : 'disabled (no TEBEX_PRIVATE_KEY)'}`)
+  console.log(
+    `Checkout API: ${
+      config.privateKey
+        ? config.storeId
+          ? `enabled (store ID ${config.storeId})`
+          : 'disabled (store ID resolution failed)'
+        : 'disabled (no TEBEX_PRIVATE_KEY)'
+    }`
+  )
   void runKeyChecks(config)
 })

@@ -22,15 +22,15 @@ cp .env.example .env
 
 | Variable | Required | Purpose |
 |----------|----------|---------|
-| `TEBEX_WEBSTORE_TOKEN` | Yes | Headless API — store info, categories, packages |
+| `TEBEX_PUBLIC_KEY` | Yes | Headless API — store info, categories, packages |
 | `JOELY_SHARED_SECRET` | Yes | HMAC secret, generated in the Joely dashboard |
-| `TEBEX_SECRET_KEY` | No | Plugin API — payment lookup, coupons, gift cards |
-| `TEBEX_STORE_ID` + `TEBEX_PRIVATE_KEY` | No | Checkout API — transaction details |
+| `TEBEX_GAME_SERVER_SECRET_KEY` | No | Plugin API — payment lookup, coupons, gift cards |
+| `TEBEX_PRIVATE_KEY` | No | Checkout API — transaction details (the store ID is resolved automatically from your public key) |
 | `PORT` | No | Listen port (default 3000) |
 
-Optional keys only disable their feature: without `TEBEX_SECRET_KEY`, coupon/gift-card features simply won't work in Joely.
+Optional keys only disable their feature: without `TEBEX_GAME_SERVER_SECRET_KEY`, coupon/gift-card features simply won't work in Joely.
 
-On startup, the bridge verifies each configured key against the Tebex API and logs one `✓` / `✗` line per key (webstore token, Checkout store ID + private key, game server secret key), so an invalid or mistyped key is visible immediately instead of failing on the first real request.
+On startup, the bridge verifies each configured key against the Tebex API and logs one `✓` / `✗` line per key (public key, Checkout private key, game server secret key), so an invalid or mistyped key is visible immediately instead of failing on the first real request.
 
 ### 2. Run
 

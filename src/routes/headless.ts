@@ -5,15 +5,15 @@ import { headlessAccountBase } from '../utils/tebex.js'
 
 /**
  * Headless API routes (https://docs.tebex.io/developers)
- * Auth: webstore token in the URL path, injected from the bridge's own env.
- * The token never appears in the routes Joely calls.
+ * Auth: public key in the URL path, injected from the bridge's own env.
+ * The key never appears in the routes Joely calls.
  *
  * Used by Joely for: store info, categories, packages.
  */
 export const headless = new Hono()
 
 function accountBase(): string {
-  return headlessAccountBase(config.webstoreToken)
+  return headlessAccountBase(config.publicKey)
 }
 
 // GET /v1/headless/accounts — store info

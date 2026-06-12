@@ -9,7 +9,7 @@ import {
 
 const TEBEX_TIMEOUT_MS = 10_000
 
-export type KeyStatus = 'valid' | 'invalid' | 'unreachable' | 'not_configured'
+export type KeyStatus = 'valid' | 'invalid' | 'store_mismatch' | 'unreachable' | 'not_configured'
 
 async function probeStatus(url: string, headers?: Record<string, string>): Promise<number | null> {
   try {
@@ -30,6 +30,8 @@ export async function checkPublicKey(config: BridgeConfig): Promise<KeyStatus> {
 /**
  * Private key (Checkout API): Tebex's validation trick — a 404 on a
  * fictitious payment means the credentials are valid, 401/403 means not.
+ * Same-store is implicit: Basic auth uses the store ID resolved from
+ * TEBEX_PUBLIC_KEY, so a key from another store is rejected by Tebex.
  */
 export async function checkCheckoutKeys(config: BridgeConfig): Promise<KeyStatus> {
   if (!config.privateKey) return 'not_configured'
@@ -43,20 +45,36 @@ export async function checkCheckoutKeys(config: BridgeConfig): Promise<KeyStatus
   return status === 404 || status === 200 ? 'valid' : 'invalid'
 }
 
-/** Game server key (Plugin API secret): /information returns 200 when valid */
+/**
+ * Game server key (Plugin API secret): /information returns 200 when valid.
+ * The response carries the account ID — when the store ID is known (resolved
+ * from the public key at startup), a key that belongs to a different Tebex
+ * store than TEBEX_PUBLIC_KEY is reported as a mismatch.
+ */
 export async function checkGameServerSecretKey(config: BridgeConfig): Promise<KeyStatus> {
   if (!config.gameServerSecretKey) return 'not_configured'
-  const status = await probeStatus(
-    `${TEBEX_PLUGIN_API_BASE}/information`,
-    pluginHeaders(config.gameServerSecretKey)
-  )
-  if (status === null) return 'unreachable'
-  return status === 200 ? 'valid' : 'invalid'
+  try {
+    const response = await fetch(`${TEBEX_PLUGIN_API_BASE}/information`, {
+      headers: pluginHeaders(config.gameServerSecretKey),
+      signal: AbortSignal.timeout(TEBEX_TIMEOUT_MS),
+    })
+    if (response.status !== 200) return 'invalid'
+    if (config.storeId) {
+      const body = (await response.json()) as { account?: { id?: number | string } }
+      if (body.account?.id != null && String(body.account.id) !== config.storeId) {
+        return 'store_mismatch'
+      }
+    }
+    return 'valid'
+  } catch {
+    return 'unreachable'
+  }
 }
 
 const STATUS_LABELS: Record<KeyStatus, string> = {
   valid: '✓',
   invalid: '✗ (rejected by Tebex)',
+  store_mismatch: '✗ (valid key, but for a DIFFERENT Tebex store than TEBEX_PUBLIC_KEY)',
   unreachable: '? (Tebex API unreachable)',
   not_configured: '- (not configured)',
 }

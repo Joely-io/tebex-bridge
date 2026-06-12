@@ -130,4 +130,33 @@ describe('checkGameServerSecretKey', () => {
     mockFetchStatus(403)
     await expect(checkGameServerSecretKey(buildConfig())).resolves.toBe('invalid')
   })
+
+  it('returns valid when the account id matches the resolved store id', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ account: { id: 12345 } })))
+    )
+    await expect(checkGameServerSecretKey(buildConfig())).resolves.toBe('valid')
+  })
+
+  it('returns store_mismatch when the key belongs to another store', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ account: { id: 99999 } })))
+    )
+    await expect(checkGameServerSecretKey(buildConfig())).resolves.toBe('store_mismatch')
+  })
+
+  it('skips the same-store check when the store id could not be resolved', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ account: { id: 99999 } })))
+    )
+    await expect(checkGameServerSecretKey(buildConfig({ storeId: null }))).resolves.toBe('valid')
+  })
+
+  it('returns unreachable on network error', async () => {
+    mockFetchError()
+    await expect(checkGameServerSecretKey(buildConfig())).resolves.toBe('unreachable')
+  })
 })

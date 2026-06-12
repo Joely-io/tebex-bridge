@@ -40,15 +40,16 @@ app.route('/v1/plugin', plugin)
 app.route('/v1/headless', headless)
 app.route('/v1/checkout', checkout)
 
-// Checkout Basic auth needs the store ID — resolved from the Headless API
-// account lookup at startup so it never has to be configured by hand.
-if (config.privateKey) {
-  config.storeId = await resolveStoreId(config.publicKey)
-  if (!config.storeId) {
-    console.error(
-      'Could not resolve the store ID from the Headless API (check TEBEX_PUBLIC_KEY) — Checkout routes are disabled until restart'
-    )
-  }
+// The store ID anchors the startup same-store key check and the Checkout
+// Basic auth — resolved from the Headless API account lookup at startup so
+// it never has to be configured by hand.
+config.storeId = await resolveStoreId(config.publicKey)
+if (!config.storeId) {
+  console.error(
+    `Could not resolve the store ID from the Headless API (check TEBEX_PUBLIC_KEY)${
+      config.privateKey ? ' — Checkout routes are disabled until restart' : ''
+    }`
+  )
 }
 
 serve({ fetch: app.fetch, port: config.port }, (info) => {

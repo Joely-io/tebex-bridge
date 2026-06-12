@@ -10,8 +10,9 @@ const TEBEX_CHECKOUT_API_BASE = 'https://checkout.tebex.io/api'
  * Auth: HTTP Basic ({storeId}:{privateKey}), injected from the bridge's own env.
  *
  * Used by Joely for: transaction/payment details, credential validation.
- * Payment responses are sanitized: customer email, IP and username are
- * stripped before the response leaves this bridge (see utils/sanitize.ts).
+ * Payment responses are sanitized: the customer object is reduced to the
+ * webstore username and gift-recipient usernames are stripped before the
+ * response leaves this bridge (see utils/sanitize.ts).
  */
 export const checkout = new Hono()
 

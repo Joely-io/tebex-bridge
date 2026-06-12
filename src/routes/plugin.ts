@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { config } from '../config.js'
 import { proxyToTebex } from '../utils/proxy.js'
+import { sanitizeUserLookup } from '../utils/sanitize.js'
 
 const TEBEX_PLUGIN_API_BASE = 'https://plugin.tebex.io'
 
@@ -9,6 +10,9 @@ const TEBEX_PLUGIN_API_BASE = 'https://plugin.tebex.io'
  * Auth: X-Tebex-Secret header, injected from the bridge's own env.
  *
  * Used by Joely for: store info, customer payment lookup, coupons, gift cards.
+ * User lookup responses are sanitized: the player profile and customer
+ * behaviour stats are stripped before the response leaves this bridge
+ * (see utils/sanitize.ts).
  */
 export const plugin = new Hono()
 
@@ -35,10 +39,11 @@ plugin.get('/information', (c) =>
   proxyToTebex(c, `${TEBEX_PLUGIN_API_BASE}/information`, { headers: pluginHeaders() })
 )
 
-// GET /v1/plugin/user/:userId — customer payment lookup
+// GET /v1/plugin/user/:userId — customer payment lookup (PII stripped)
 plugin.get('/user/:userId', (c) =>
   proxyToTebex(c, `${TEBEX_PLUGIN_API_BASE}/user/${encodeURIComponent(c.req.param('userId'))}`, {
     headers: pluginHeaders(),
+    transform: sanitizeUserLookup,
   })
 )
 

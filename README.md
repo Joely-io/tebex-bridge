@@ -8,7 +8,7 @@ By default, Joely stores your Tebex API keys encrypted (AES-256-GCM envelope enc
 
 1. Your Tebex keys live in this bridge's `.env`, on your server
 2. Joely calls your bridge — never the Tebex API directly
-3. The bridge proxies requests to Tebex and **strips customer PII** (email, IP, username) from payment responses before they reach Joely
+3. The bridge proxies requests to Tebex and **strips customer PII** (name, email, IP, address, player profile) from payment and customer lookup responses before they reach Joely
 
 The whole bridge is ~400 lines of TypeScript. Audit it yourself: every route it exposes is listed below, and any other path returns 404 — it cannot be used as an arbitrary Tebex proxy.
 
@@ -65,7 +65,9 @@ In your Joely dashboard: **Settings → Tebex → your store → Self-hosted bri
 - Every request from Joely is signed with **HMAC-SHA256** over `timestamp + method + path + body-hash`, with a 5-minute anti-replay window
 - Signatures are compared in constant time
 - The bridge exposes **only** the 13 routes Joely needs (see `src/routes/`); everything else is 404
-- Customer PII (`customer.email`, `customer.ip`, `customer.username`) is stripped from Checkout payment responses — see `src/utils/sanitize.ts`
+- Customer PII is stripped before responses leave the bridge — see `src/utils/sanitize.ts`:
+  - Checkout payments: the `customer` object is reduced to the webstore username (no name, email, IP, country, postal code, marketing consent), and gift-recipient usernames are removed from `products[]`
+  - Plugin user lookups: the `player` profile, `banCount`, `chargebackRate` and `purchaseTotals` are removed — only `payments[]` (txn id, time, price, currency, status) passes through
 - The bridge never logs request bodies, headers, or key material — only `METHOD /path -> status`
 
 ## Routes
@@ -75,7 +77,7 @@ In your Joely dashboard: **Settings → Tebex → your store → Self-hosted bri
 | `GET /v1/health` | — (public liveness check) |
 | `GET /v1/auth-check` | — (signed no-op, verifies the shared secret) |
 | `GET /v1/plugin/information` | `plugin.tebex.io/information` |
-| `GET /v1/plugin/user/:userId` | `plugin.tebex.io/user/:userId` |
+| `GET /v1/plugin/user/:userId` | `plugin.tebex.io/user/:userId` (PII stripped) |
 | `POST /v1/plugin/coupons` | `plugin.tebex.io/coupons` |
 | `GET /v1/plugin/coupons/:id` | `plugin.tebex.io/coupons/:id` |
 | `POST /v1/plugin/gift-cards` | `plugin.tebex.io/gift-cards` |

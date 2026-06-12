@@ -41,12 +41,12 @@ docker build -t tebex-bridge .
 docker run -d --env-file .env -p 3000:3000 tebex-bridge
 ```
 
-**Node 20+:**
+**Node 20+** (no pnpm yet? run `corepack enable` once — it ships with Node):
 
 ```bash
-npm install
-npm run build
-npm start
+pnpm install
+pnpm build
+pnpm start
 ```
 
 ### 3. Expose over HTTPS
@@ -96,7 +96,7 @@ In your Joely dashboard: **Settings → Tebex → your store → Self-hosted bri
 When Joely adds new Tebex features, your bridge may need an update to expose the new routes. Joely will surface a clear error if a feature requires a newer bridge version. Update with:
 
 ```bash
-git pull && npm install && npm run build && npm start
+git pull && pnpm install && pnpm build && pnpm start
 ```
 
 ## Uptime
@@ -106,10 +106,10 @@ If your bridge is down, real-time Tebex features in Joely (transaction lookup, c
 ## Development
 
 ```bash
-npm install
-npm run dev        # watch mode
-npm test           # vitest
-npm run typecheck
+pnpm install
+pnpm dev           # watch mode
+pnpm test          # vitest
+pnpm typecheck
 ```
 
 ## License

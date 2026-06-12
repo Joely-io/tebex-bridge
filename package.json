@@ -4,6 +4,7 @@
   "description": "Self-hosted bridge that securely connects Tebex to Joely while keeping your API keys on your own server.",
   "type": "module",
   "license": "AGPL-3.0-only",
+  "packageManager": "pnpm@10.18.3",
   "engines": {
     "node": ">=20"
   },

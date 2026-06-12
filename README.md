@@ -112,4 +112,4 @@ npm run typecheck
 
 ## License
 
-MIT
+GNU AGPL v3

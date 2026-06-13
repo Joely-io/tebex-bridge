@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { config } from './config.js'
 import { resolveStoreId } from './utils/tebex.js'
-import { runKeyChecks } from './utils/keycheck.js'
+import { runKeyChecks, getKeyStatuses } from './utils/keycheck.js'
 import { hmacAuth } from './middleware/hmac.js'
 import { plugin } from './routes/plugin.js'
 import { headless } from './routes/headless.js'
@@ -31,8 +31,26 @@ app.get('/v1/health', (c) => c.json({ status: 'ok', version: pkg.version }))
 // Everything else under /v1 requires a valid Joely HMAC signature
 app.use('/v1/*', hmacAuth)
 
-// Signed no-op — lets Joely verify the shared secret without calling Tebex
-app.get('/v1/auth-check', (c) => c.json({ ok: true }))
+// Signed endpoint — lets Joely verify the shared secret without calling Tebex,
+// and reports which Tebex keys this bridge actually serves (from the startup
+// key check, see runKeyChecks). Booleans only: `true` means the key is present
+// AND validated against Tebex for the resolved store. `keys` is null until the
+// startup check resolves (a few seconds after boot). Kept off the public
+// /v1/health so the bridge's capabilities are not disclosed unauthenticated.
+app.get('/v1/auth-check', (c) => {
+  const statuses = getKeyStatuses()
+  return c.json({
+    ok: true,
+    version: pkg.version,
+    keys: statuses
+      ? {
+          public: statuses.public === 'valid',
+          private: statuses.private === 'valid',
+          game: statuses.game === 'valid',
+        }
+      : null,
+  })
+})
 
 // The three Tebex API groups. Any route not declared here returns 404 —
 // this bridge can NOT be used as an arbitrary Tebex proxy.

@@ -1,6 +1,12 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import type { BridgeConfig } from '../config.js'
-import { checkPublicKey, checkCheckoutKeys, checkGameServerSecretKey } from '../utils/keycheck.js'
+import {
+  checkPublicKey,
+  checkCheckoutKeys,
+  checkGameServerSecretKey,
+  runKeyChecks,
+  getKeyStatuses,
+} from '../utils/keycheck.js'
 import { resolveStoreId } from '../utils/tebex.js'
 
 function buildConfig(overrides: Partial<BridgeConfig> = {}): BridgeConfig {
@@ -158,5 +164,27 @@ describe('checkGameServerSecretKey', () => {
   it('returns unreachable on network error', async () => {
     mockFetchError()
     await expect(checkGameServerSecretKey(buildConfig())).resolves.toBe('unreachable')
+  })
+})
+
+describe('runKeyChecks', () => {
+  it('caches the computed statuses so getKeyStatuses() can expose them', async () => {
+    // 200 on every probe → public valid, checkout valid (200), game valid
+    // (no account.id in the body skips the same-store check)
+    mockFetchStatus(200)
+    const result = await runKeyChecks(buildConfig())
+
+    expect(result).toEqual({ public: 'valid', private: 'valid', game: 'valid' })
+    expect(getKeyStatuses()).toEqual(result)
+  })
+
+  it('records non-valid statuses (missing keys → not_configured)', async () => {
+    mockFetchStatus(200)
+    const result = await runKeyChecks(
+      buildConfig({ privateKey: null, storeId: null, gameServerSecretKey: null })
+    )
+
+    expect(result).toEqual({ public: 'valid', private: 'not_configured', game: 'not_configured' })
+    expect(getKeyStatuses()).toEqual(result)
   })
 })

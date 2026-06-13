@@ -11,6 +11,27 @@ const TEBEX_TIMEOUT_MS = 10_000
 
 export type KeyStatus = 'valid' | 'invalid' | 'store_mismatch' | 'unreachable' | 'not_configured'
 
+export interface KeyStatuses {
+  /** Headless API (TEBEX_PUBLIC_KEY) */
+  public: KeyStatus
+  /** Checkout API (TEBEX_PRIVATE_KEY) */
+  private: KeyStatus
+  /** Plugin API game-server secret (TEBEX_GAME_SERVER_SECRET_KEY) */
+  game: KeyStatus
+}
+
+// Snapshot of the startup key check, surfaced (as booleans) on the signed
+// /v1/auth-check so Joely can show accurate per-store capabilities without
+// hitting the (rate-limited) Plugin API on every connection test. null until
+// the startup check resolves. Key/store config changes require a bridge
+// restart to take effect, so a startup snapshot never goes stale silently.
+let cachedStatuses: KeyStatuses | null = null
+
+/** The cached startup key statuses, or null if the check hasn't resolved yet. */
+export function getKeyStatuses(): KeyStatuses | null {
+  return cachedStatuses
+}
+
 async function probeStatus(url: string, headers?: Record<string, string>): Promise<number | null> {
   try {
     const response = await fetch(url, { headers, signal: AbortSignal.timeout(TEBEX_TIMEOUT_MS) })
@@ -79,8 +100,11 @@ const STATUS_LABELS: Record<KeyStatus, string> = {
   not_configured: '- (not configured)',
 }
 
-/** Verify every configured key against the Tebex API and log one line per key */
-export async function runKeyChecks(config: BridgeConfig): Promise<void> {
+/**
+ * Verify every configured key against the Tebex API, log one line per key, and
+ * cache the result so /v1/auth-check can report the bridge's capabilities.
+ */
+export async function runKeyChecks(config: BridgeConfig): Promise<KeyStatuses> {
   const [publicKey, checkoutKeys, gameServerSecretKey] = await Promise.all([
     checkPublicKey(config),
     checkCheckoutKeys(config),
@@ -91,4 +115,7 @@ export async function runKeyChecks(config: BridgeConfig): Promise<void> {
   console.log(`  Public key (TEBEX_PUBLIC_KEY):                  ${STATUS_LABELS[publicKey]}`)
   console.log(`  Private key (TEBEX_PRIVATE_KEY):                ${STATUS_LABELS[checkoutKeys]}`)
   console.log(`  Game server key (TEBEX_GAME_SERVER_SECRET_KEY): ${STATUS_LABELS[gameServerSecretKey]}`)
+
+  cachedStatuses = { public: publicKey, private: checkoutKeys, game: gameServerSecretKey }
+  return cachedStatuses
 }

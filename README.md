@@ -77,7 +77,7 @@ In your Joely dashboard: **Settings → Tebex → your store → Self-hosted bri
 | Bridge route | Proxies to |
 |--------------|-----------|
 | `GET /v1/health` | — (public liveness check) |
-| `GET /v1/auth-check` | — (signed no-op, verifies the shared secret) |
+| `GET /v1/auth-check` | — (signed; verifies the shared secret and reports the startup key check as `keys: { public, private, game }` booleans) |
 | `GET /v1/plugin/information` | `plugin.tebex.io/information` |
 | `GET /v1/plugin/user/:userId` | `plugin.tebex.io/user/:userId` (PII stripped) |
 | `POST /v1/plugin/coupons` | `plugin.tebex.io/coupons` |

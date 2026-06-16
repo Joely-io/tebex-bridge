@@ -62,14 +62,36 @@ In your Joely dashboard: **Settings → Tebex → your store → Self-hosted bri
 3. Generate the shared secret, copy it into your `.env` as `JOELY_SHARED_SECRET`
 4. Restart the bridge, then click "Test connection"
 
+## What the bridge sends to Joely
+
+The bridge is a proxy: it forwards Tebex's responses to Joely. On the two routes that carry buyer PII, it first runs the JSON sanitizer (`src/utils/sanitize.ts`) to drop fields Joely never uses. Joely only consumes transaction data (ids, prices, statuses, currency, product names) and the buyer's webstore username — nothing that identifies the person.
+
+**`GET /v1/checkout/payments/:txnId`** (Checkout API — order detail) — `sanitizePayment()`:
+
+| Tebex field | Sent to Joely? |
+|-------------|----------------|
+| `customer.username` (webstore username) | ✅ kept |
+| `customer.first_name`, `last_name`, `email`, `ip`, `country`, `postal_code`, `marketing_consent` | ❌ stripped |
+| `products[].username` (gift recipient) | ❌ stripped |
+| everything else (txn id, status, prices, currency, product names, dates, fees…) | ✅ passes through |
+
+**`GET /v1/plugin/user/:userId`** (Plugin API — purchase history) — `sanitizeUserLookup()`:
+
+| Tebex field | Sent to Joely? |
+|-------------|----------------|
+| `payments[]` (txn id, time, price, currency, status) | ✅ kept |
+| `player` (player profile), `banCount`, `chargebackRate`, `purchaseTotals` | ❌ stripped |
+
+The sanitizer **never mutates** the upstream object — it returns a copy, so a parsing bug can only ever drop fields, never expose more than intended. The Checkout customer block is an **allowlist** (only `username` survives, so any new PII field Tebex adds is removed by default); the Plugin lookup is a **denylist** (the four behaviour/profile fields are removed, so new non-PII fields pass through automatically).
+
+**All other routes pass through unmodified** because they carry no buyer PII: store information, the package catalog (Headless API), and coupons / gift cards (which Joely itself creates). See the [Routes](#routes) table.
+
 ## Security model
 
 - Every request from Joely is signed with **HMAC-SHA256** over `timestamp + method + path + body-hash`, with a 5-minute anti-replay window
 - Signatures are compared in constant time
 - The bridge exposes **only** the 13 routes Joely needs (see `src/routes/`); everything else is 404
-- Customer PII is stripped before responses leave the bridge — see `src/utils/sanitize.ts`:
-  - Checkout payments: the `customer` object is reduced to the webstore username (no name, email, IP, country, postal code, marketing consent), and gift-recipient usernames are removed from `products[]`
-  - Plugin user lookups: the `player` profile, `banCount`, `chargebackRate` and `purchaseTotals` are removed — only `payments[]` (txn id, time, price, currency, status) passes through
+- Customer PII is stripped before responses leave the bridge — see [What the bridge sends to Joely](#what-the-bridge-sends-to-joely) above and `src/utils/sanitize.ts`
 - The bridge never logs request bodies, headers, or key material — only `METHOD /path -> status`
 
 ## Routes

@@ -24,11 +24,11 @@ cp .env.example .env
 |----------|----------|---------|
 | `TEBEX_PUBLIC_KEY` | Yes | Headless API — store info, categories, packages |
 | `JOELY_SHARED_SECRET` | Yes | HMAC secret, generated in the Joely dashboard |
-| `TEBEX_GAME_SERVER_SECRET_KEY` | No | Plugin API — payment lookup, coupons, gift cards |
+| `TEBEX_GAME_SERVER_SECRET_KEY` | No | Plugin API — payment lookup, coupons, gift cards, manual payments |
 | `TEBEX_PRIVATE_KEY` | No | Checkout API — transaction details (the store ID is resolved automatically from your public key) |
 | `PORT` | No | Listen port (default 3000) |
 
-Optional keys only disable their feature: without `TEBEX_GAME_SERVER_SECRET_KEY`, coupon/gift-card features simply won't work in Joely.
+Optional keys only disable their feature: without `TEBEX_GAME_SERVER_SECRET_KEY`, coupon / gift-card / manual-payment features simply won't work in Joely.
 
 On startup, the bridge verifies each configured key against the Tebex API and logs one `✓` / `✗` line per key (public key, Checkout private key, game server secret key), so an invalid or mistyped key is visible immediately instead of failing on the first real request.
 
@@ -84,13 +84,13 @@ The bridge is a proxy: it forwards Tebex's responses to Joely. On the two routes
 
 The sanitizer **never mutates** the upstream object — it returns a copy, so a parsing bug can only ever drop fields, never expose more than intended. The Checkout customer block is an **allowlist** (only `username` survives, so any new PII field Tebex adds is removed by default); the Plugin lookup is a **denylist** (the four behaviour/profile fields are removed, so new non-PII fields pass through automatically).
 
-**All other routes pass through unmodified** because they carry no buyer PII: store information, the package catalog (Headless API), and coupons / gift cards (which Joely itself creates). See the [Routes](#routes) table.
+**All other routes pass through unmodified** because they carry no buyer PII: store information, the package catalog (Headless API), and coupons / gift cards / manual payments (which Joely itself creates). See the [Routes](#routes) table.
 
 ## Security model
 
 - Every request from Joely is signed with **HMAC-SHA256** over `timestamp + method + path + body-hash`, with a 5-minute anti-replay window
 - Signatures are compared in constant time
-- The bridge exposes **only** the 13 routes Joely needs (see `src/routes/`); everything else is 404
+- The bridge exposes **only** the 15 routes Joely needs (see `src/routes/`); everything else is 404
 - Customer PII is stripped before responses leave the bridge — see [What the bridge sends to Joely](#what-the-bridge-sends-to-joely) above and `src/utils/sanitize.ts`
 - The bridge never logs request bodies, headers, or key material — only `METHOD /path -> status`
 
@@ -106,6 +106,8 @@ The sanitizer **never mutates** the upstream object — it returns a copy, so a 
 | `GET /v1/plugin/coupons/:id` | `plugin.tebex.io/coupons/:id` |
 | `POST /v1/plugin/gift-cards` | `plugin.tebex.io/gift-cards` |
 | `GET /v1/plugin/gift-cards/:id` | `plugin.tebex.io/gift-cards/:id` |
+| `GET /v1/plugin/payments/fields/:packageId` | `plugin.tebex.io/payments/fields/:packageId` |
+| `POST /v1/plugin/payments` | `plugin.tebex.io/payments` (manual payment, delivers packages) |
 | `GET /v1/headless/accounts` | `headless.tebex.io/api/accounts/{token}` |
 | `GET /v1/headless/categories` | `headless.tebex.io/api/accounts/{token}/categories` |
 | `GET /v1/headless/packages` | `headless.tebex.io/api/accounts/{token}/packages` |

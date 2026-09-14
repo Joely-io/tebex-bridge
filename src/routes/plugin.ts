@@ -8,7 +8,8 @@ import { TEBEX_PLUGIN_API_BASE, pluginHeaders as buildPluginHeaders } from '../u
  * Plugin API routes (https://docs.tebex.io/plugin)
  * Auth: X-Tebex-Secret header, injected from the bridge's own env.
  *
- * Used by Joely for: store info, customer payment lookup, coupons, gift cards.
+ * Used by Joely for: store info, customer payment lookup, coupons, gift cards,
+ * manual payments (package delivery at price 0).
  * User lookup responses are sanitized: the player profile and customer
  * behaviour stats are stripped before the response leaves this bridge
  * (see utils/sanitize.ts).
@@ -75,4 +76,22 @@ plugin.get('/gift-cards/:giftCardId', (c) =>
     `${TEBEX_PLUGIN_API_BASE}/gift-cards/${encodeURIComponent(c.req.param('giftCardId'))}`,
     { headers: pluginHeaders() }
   )
+)
+
+// GET /v1/plugin/payments/fields/:packageId — required fields of a package (manual payment form)
+plugin.get('/payments/fields/:packageId', (c) =>
+  proxyToTebex(
+    c,
+    `${TEBEX_PLUGIN_API_BASE}/payments/fields/${encodeURIComponent(c.req.param('packageId'))}`,
+    { headers: pluginHeaders() }
+  )
+)
+
+// POST /v1/plugin/payments — create a manual payment (delivers packages; Tebex answers 204)
+plugin.post('/payments', async (c) =>
+  proxyToTebex(c, `${TEBEX_PLUGIN_API_BASE}/payments`, {
+    method: 'POST',
+    headers: pluginHeaders(),
+    body: await c.req.text(),
+  })
 )

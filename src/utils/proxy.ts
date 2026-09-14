@@ -2,6 +2,9 @@ import type { Context } from 'hono'
 
 const TEBEX_TIMEOUT_MS = 10_000
 
+/** Statuses that must carry no body: `new Response('', { status: 204 })` throws in Node */
+const NULL_BODY_STATUSES = new Set([204, 205, 304])
+
 export interface ProxyOptions {
   method?: string
   headers?: Record<string, string>
@@ -16,6 +19,7 @@ export interface ProxyOptions {
  * - The Tebex HTTP status is passed through as-is (Joely interprets 404s etc.)
  * - The response body is passed through verbatim, unless a `transform` is
  *   provided (used to strip PII from Checkout payment responses)
+ * - A 204 / 205 / 304 is forwarded with no body (e.g. POST /payments)
  * - Network errors / timeouts return 502
  */
 export async function proxyToTebex(c: Context, url: string, options: ProxyOptions = {}) {
@@ -32,6 +36,10 @@ export async function proxyToTebex(c: Context, url: string, options: ProxyOption
   }
 
   const rawBody = await response.text()
+
+  if (NULL_BODY_STATUSES.has(response.status)) {
+    return c.body(null, response.status as never)
+  }
 
   if (!options.transform || !response.ok) {
     return c.newResponse(rawBody, response.status as never, {

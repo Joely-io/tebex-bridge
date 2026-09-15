@@ -1,18 +1,19 @@
 import { Hono } from 'hono'
 import { config } from '../config.js'
 import { proxyToTebex } from '../utils/proxy.js'
-import { sanitizeUserLookup } from '../utils/sanitize.js'
+import { sanitizePluginPayment, sanitizeUserLookup } from '../utils/sanitize.js'
 import { TEBEX_PLUGIN_API_BASE, pluginHeaders as buildPluginHeaders } from '../utils/tebex.js'
 
 /**
  * Plugin API routes (https://docs.tebex.io/plugin)
  * Auth: X-Tebex-Secret header, injected from the bridge's own env.
  *
- * Used by Joely for: store info, customer payment lookup, coupons, gift cards,
- * manual payments (package delivery at price 0).
- * User lookup responses are sanitized: the player profile and customer
- * behaviour stats are stripped before the response leaves this bridge
- * (see utils/sanitize.ts).
+ * Used by Joely for: store info, customer payment lookup, payment lookup by
+ * transaction id, coupons, gift cards, manual payments (package delivery at
+ * price 0).
+ * User and payment lookup responses are sanitized: buyer PII (player profile,
+ * email, IP, customer behaviour stats) is stripped before the response leaves
+ * this bridge (see utils/sanitize.ts).
  */
 export const plugin = new Hono()
 
@@ -30,6 +31,12 @@ plugin.use('*', async (c, next) => {
 function pluginHeaders(): Record<string, string> {
   return buildPluginHeaders(config.gameServerSecretKey!)
 }
+
+/**
+ * Tebex transaction ids (e.g. `tbx-26929122a16272-9c4f1d`). No dot, slash or
+ * percent sign is allowed, so the id can never walk out of `/payments/`.
+ */
+const TRANSACTION_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/
 
 // GET /v1/plugin/information — store info
 plugin.get('/information', (c) =>
@@ -86,6 +93,27 @@ plugin.get('/payments/fields/:packageId', (c) =>
     { headers: pluginHeaders() }
   )
 )
+
+// GET /v1/plugin/payments/:transaction (payment details by transaction id, PII stripped).
+// Fallback when the Checkout API cannot find a transaction. An invalid id is
+// refused with a 400 and never reaches Tebex; Tebex's own statuses (404
+// included) are passed through unchanged.
+plugin.get('/payments/:transaction', (c) => {
+  const transaction = c.req.param('transaction')
+  if (!TRANSACTION_ID_PATTERN.test(transaction)) {
+    return c.json(
+      {
+        error: 'INVALID_TRANSACTION_ID',
+        message: 'The transaction id may only contain letters, digits, "-" and "_" (64 characters max)',
+      },
+      400
+    )
+  }
+  return proxyToTebex(c, `${TEBEX_PLUGIN_API_BASE}/payments/${encodeURIComponent(transaction)}`, {
+    headers: pluginHeaders(),
+    transform: sanitizePluginPayment,
+  })
+})
 
 // POST /v1/plugin/payments — create a manual payment (delivers packages; Tebex answers 204)
 plugin.post('/payments', async (c) =>

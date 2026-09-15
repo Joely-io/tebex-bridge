@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sanitizePayment, sanitizeUserLookup } from '../utils/sanitize.js'
+import { sanitizePayment, sanitizePluginPayment, sanitizeUserLookup } from '../utils/sanitize.js'
 
 describe('sanitizePayment', () => {
   it('reduces customer to the webstore username only', () => {
@@ -120,5 +120,56 @@ describe('sanitizeUserLookup', () => {
   it('handles non-object responses', () => {
     expect(sanitizeUserLookup(null)).toBeNull()
     expect(sanitizeUserLookup([1, 2])).toEqual([1, 2])
+  })
+})
+
+describe('sanitizePluginPayment', () => {
+  it('drops email and ip and reduces player to its name', () => {
+    const payment = {
+      id: 42,
+      amount: '9.99',
+      status: 'Complete',
+      email: 'buyer@example.com',
+      ip: '1.2.3.4',
+      player: { id: 7, name: 'buyer_ign', uuid: '76561198000000000' },
+      packages: [{ id: 5, name: 'VIP', quantity: 1 }],
+    }
+
+    expect(sanitizePluginPayment(payment)).toEqual({
+      id: 42,
+      amount: '9.99',
+      status: 'Complete',
+      player: { name: 'buyer_ign' },
+      packages: [{ id: 5, name: 'VIP', quantity: 1 }],
+    })
+  })
+
+  it('returns an empty player when it has no name', () => {
+    const result = sanitizePluginPayment({ player: { id: 7, uuid: 'x' } }) as Record<string, any>
+    expect(result.player).toEqual({})
+  })
+
+  it('passes through unknown fields, notes included', () => {
+    const result = sanitizePluginPayment({
+      new_tebex_field: 'value',
+      notes: [{ note: 'Joely ticket #12' }],
+      email: 'x@y.z',
+    }) as Record<string, any>
+
+    expect(result.new_tebex_field).toBe('value')
+    expect(result.notes).toEqual([{ note: 'Joely ticket #12' }])
+    expect(result.email).toBeUndefined()
+  })
+
+  it('does not mutate the original object', () => {
+    const payment = { email: 'x@y.z', player: { name: 'n', uuid: 'u' } }
+    sanitizePluginPayment(payment)
+    expect(payment.email).toBe('x@y.z')
+    expect(payment.player.uuid).toBe('u')
+  })
+
+  it('handles non-object responses', () => {
+    expect(sanitizePluginPayment(null)).toBeNull()
+    expect(sanitizePluginPayment([1, 2])).toEqual([1, 2])
   })
 })

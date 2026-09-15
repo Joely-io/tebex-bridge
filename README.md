@@ -64,7 +64,7 @@ In your Joely dashboard: **Settings → Tebex → your store → Self-hosted bri
 
 ## What the bridge sends to Joely
 
-The bridge is a proxy: it forwards Tebex's responses to Joely. On the two routes that carry buyer PII, it first runs the JSON sanitizer (`src/utils/sanitize.ts`) to drop fields Joely never uses. Joely only consumes transaction data (ids, prices, statuses, currency, product names) and the buyer's webstore username — nothing that identifies the person.
+The bridge is a proxy: it forwards Tebex's responses to Joely. On the three routes that carry buyer PII, it first runs the JSON sanitizer (`src/utils/sanitize.ts`) to drop fields Joely never uses. Joely only consumes transaction data (ids, prices, statuses, currency, product names) and the buyer's webstore username — nothing that identifies the person.
 
 **`GET /v1/checkout/payments/:txnId`** (Checkout API — order detail) — `sanitizePayment()`:
 
@@ -82,7 +82,17 @@ The bridge is a proxy: it forwards Tebex's responses to Joely. On the two routes
 | `payments[]` (txn id, time, price, currency, status) | ✅ kept |
 | `player` (player profile), `banCount`, `chargebackRate`, `purchaseTotals` | ❌ stripped |
 
-The sanitizer **never mutates** the upstream object — it returns a copy, so a parsing bug can only ever drop fields, never expose more than intended. The Checkout customer block is an **allowlist** (only `username` survives, so any new PII field Tebex adds is removed by default); the Plugin lookup is a **denylist** (the four behaviour/profile fields are removed, so new non-PII fields pass through automatically).
+**`GET /v1/plugin/payments/:transaction`** (Plugin API: payment by transaction id, fallback when the Checkout API cannot find it), sanitized by `sanitizePluginPayment()`:
+
+| Tebex field | Sent to Joely? |
+|-------------|----------------|
+| `player.name` (webstore username) | ✅ kept |
+| `player.id`, `player.uuid`, `email`, `ip` | ❌ stripped |
+| everything else (id, amount, status, currency, gateway, packages, notes, dates…) | ✅ passes through |
+
+Only successful responses are sanitized. A Tebex error (404 for an unknown transaction included) is passed through with its original status and body, and an id outside `[A-Za-z0-9_-]{1,64}` is refused with a `400 INVALID_TRANSACTION_ID` without ever reaching Tebex.
+
+The sanitizer **never mutates** the upstream object — it returns a copy, so a parsing bug can only ever drop fields, never expose more than intended. The Checkout customer block is an **allowlist** (only `username` survives, so any new PII field Tebex adds is removed by default); the Plugin lookup is a **denylist** (the four behaviour/profile fields are removed, so new non-PII fields pass through automatically); the Plugin payment lookup combines both (`email` and `ip` are removed, and `player` is an allowlist where only `name` survives).
 
 **All other routes pass through unmodified** because they carry no buyer PII: store information, the package catalog (Headless API), and coupons / gift cards / manual payments (which Joely itself creates). See the [Routes](#routes) table.
 
@@ -90,7 +100,7 @@ The sanitizer **never mutates** the upstream object — it returns a copy, so a 
 
 - Every request from Joely is signed with **HMAC-SHA256** over `timestamp + method + path + body-hash`, with a 5-minute anti-replay window
 - Signatures are compared in constant time
-- The bridge exposes **only** the 15 routes Joely needs (see `src/routes/`); everything else is 404
+- The bridge exposes **only** the 16 routes Joely needs (see `src/routes/`); everything else is 404
 - Customer PII is stripped before responses leave the bridge — see [What the bridge sends to Joely](#what-the-bridge-sends-to-joely) above and `src/utils/sanitize.ts`
 - The bridge never logs request bodies, headers, or key material — only `METHOD /path -> status`
 
@@ -107,6 +117,7 @@ The sanitizer **never mutates** the upstream object — it returns a copy, so a 
 | `POST /v1/plugin/gift-cards` | `plugin.tebex.io/gift-cards` |
 | `GET /v1/plugin/gift-cards/:id` | `plugin.tebex.io/gift-cards/:id` |
 | `GET /v1/plugin/payments/fields/:packageId` | `plugin.tebex.io/payments/fields/:packageId` |
+| `GET /v1/plugin/payments/:transaction` | `plugin.tebex.io/payments/:transaction` (PII stripped, id checked against `[A-Za-z0-9_-]{1,64}`) |
 | `POST /v1/plugin/payments` | `plugin.tebex.io/payments` (manual payment, delivers packages) |
 | `GET /v1/headless/accounts` | `headless.tebex.io/api/accounts/{token}` |
 | `GET /v1/headless/categories` | `headless.tebex.io/api/accounts/{token}/categories` |

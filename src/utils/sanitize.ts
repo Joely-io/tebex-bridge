@@ -81,3 +81,44 @@ export function sanitizeUserLookup(lookup: unknown): unknown {
   }
   return result
 }
+
+/**
+ * Buyer PII returned at the top level of a Plugin API payment lookup
+ * (GET /payments/:transaction). Joely identifies the buyer by the webstore
+ * username only, so these are dropped outright.
+ */
+const PLUGIN_PAYMENT_PII_FIELDS = ['email', 'ip'] as const
+
+/**
+ * The Plugin payment `player` object carries the platform id and uuid next to
+ * the name. Like the Checkout customer block, it is reduced to an allowlist:
+ * only `name` (the webstore username) survives.
+ */
+function sanitizePlayer(player: unknown): unknown {
+  if (!isPlainObject(player)) {
+    return player
+  }
+  return typeof player.name === 'string' ? { name: player.name } : {}
+}
+
+/**
+ * Strip customer PII from a Plugin API payment lookup response
+ * (GET /payments/:transaction): `email` and `ip` are removed, `player` is
+ * reduced to its name. Other fields (id, amount, status, currency, gateway,
+ * packages, notes, dates) pass through. Returns a copy: the original object is
+ * not modified.
+ */
+export function sanitizePluginPayment(payment: unknown): unknown {
+  if (!isPlainObject(payment)) {
+    return payment
+  }
+
+  const result = { ...payment }
+  for (const field of PLUGIN_PAYMENT_PII_FIELDS) {
+    delete result[field]
+  }
+  if ('player' in result) {
+    result.player = sanitizePlayer(result.player)
+  }
+  return result
+}

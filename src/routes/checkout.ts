@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { config } from '../config.js'
+import { validateIdParam } from '../utils/params.js'
 import { proxyToTebex } from '../utils/proxy.js'
 import { sanitizePayment } from '../utils/sanitize.js'
 import {
@@ -45,7 +46,7 @@ function checkoutHeaders(): Record<string, string> {
 }
 
 // GET /v1/checkout/payments/:txnId[?type=txn_id] — payment details (PII stripped)
-checkout.get('/payments/:txnId', (c) => {
+checkout.get('/payments/:txnId', validateIdParam('txnId', 'INVALID_TRANSACTION_ID'), (c) => {
   const url = new URL(
     `${TEBEX_CHECKOUT_API_BASE}/payments/${encodeURIComponent(c.req.param('txnId'))}`
   )

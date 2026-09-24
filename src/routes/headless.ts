@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { config } from '../config.js'
+import { validateIdParam } from '../utils/params.js'
 import { proxyToTebex } from '../utils/proxy.js'
 import { headlessAccountBase } from '../utils/tebex.js'
 
@@ -31,6 +32,6 @@ headless.get('/categories', (c) => {
 headless.get('/packages', (c) => proxyToTebex(c, `${accountBase()}/packages`))
 
 // GET /v1/headless/packages/:packageId — single package
-headless.get('/packages/:packageId', (c) =>
+headless.get('/packages/:packageId', validateIdParam('packageId'), (c) =>
   proxyToTebex(c, `${accountBase()}/packages/${encodeURIComponent(c.req.param('packageId'))}`)
 )

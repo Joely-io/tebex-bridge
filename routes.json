@@ -1,0 +1,22 @@
+{
+  "$comment": "Every Tebex route this bridge proxies. Kept in sync with src/routes by src/__tests__/routes.test.ts; Joely's backend checks its own bridge calls against this list, so neither side can drift.",
+  "routes": [
+    { "method": "GET", "path": "/v1/plugin/information" },
+    { "method": "GET", "path": "/v1/plugin/user/:userId" },
+    { "method": "POST", "path": "/v1/plugin/coupons" },
+    { "method": "GET", "path": "/v1/plugin/coupons/:couponId" },
+    { "method": "DELETE", "path": "/v1/plugin/coupons/:couponId" },
+    { "method": "POST", "path": "/v1/plugin/gift-cards" },
+    { "method": "GET", "path": "/v1/plugin/gift-cards/:giftCardId" },
+    { "method": "DELETE", "path": "/v1/plugin/gift-cards/:giftCardId" },
+    { "method": "GET", "path": "/v1/plugin/payments/fields/:packageId" },
+    { "method": "GET", "path": "/v1/plugin/payments/:transaction" },
+    { "method": "POST", "path": "/v1/plugin/payments" },
+    { "method": "GET", "path": "/v1/headless/accounts" },
+    { "method": "GET", "path": "/v1/headless/categories" },
+    { "method": "GET", "path": "/v1/headless/packages" },
+    { "method": "GET", "path": "/v1/headless/packages/:packageId" },
+    { "method": "GET", "path": "/v1/checkout/payments/:txnId" },
+    { "method": "GET", "path": "/v1/checkout/validate" }
+  ]
+}

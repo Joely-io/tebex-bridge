@@ -100,7 +100,7 @@ The sanitizer **never mutates** the upstream object — it returns a copy, so a 
 
 - Every request from Joely is signed with **HMAC-SHA256** over `timestamp + method + path + body-hash`, with a 5-minute anti-replay window
 - Signatures are compared in constant time
-- The bridge exposes **only** the 16 routes Joely needs (see `src/routes/`); everything else is 404
+- The bridge exposes **only** the 19 routes Joely needs (see `src/routes/`); everything else is 404
 - Customer PII is stripped before responses leave the bridge — see [What the bridge sends to Joely](#what-the-bridge-sends-to-joely) above and `src/utils/sanitize.ts`
 - The bridge never logs request bodies, headers, or key material — only `METHOD /path -> status`
 
@@ -114,10 +114,12 @@ The sanitizer **never mutates** the upstream object — it returns a copy, so a 
 | `GET /v1/plugin/user/:userId` | `plugin.tebex.io/user/:userId` (PII stripped) |
 | `POST /v1/plugin/coupons` | `plugin.tebex.io/coupons` |
 | `GET /v1/plugin/coupons/:id` | `plugin.tebex.io/coupons/:id` |
+| `DELETE /v1/plugin/coupons/:id` | `plugin.tebex.io/coupons/:id` (revoke a coupon) |
 | `POST /v1/plugin/gift-cards` | `plugin.tebex.io/gift-cards` |
 | `GET /v1/plugin/gift-cards/:id` | `plugin.tebex.io/gift-cards/:id` |
+| `DELETE /v1/plugin/gift-cards/:id` | `plugin.tebex.io/gift-cards/:id` (void a gift card) |
 | `GET /v1/plugin/payments/fields/:packageId` | `plugin.tebex.io/payments/fields/:packageId` |
-| `GET /v1/plugin/payments/:transaction` | `plugin.tebex.io/payments/:transaction` (PII stripped, id checked against `[A-Za-z0-9_-]{1,64}`) |
+| `GET /v1/plugin/payments/:transaction` | `plugin.tebex.io/payments/:transaction` (PII stripped) |
 | `POST /v1/plugin/payments` | `plugin.tebex.io/payments` (manual payment, delivers packages) |
 | `GET /v1/headless/accounts` | `headless.tebex.io/api/accounts/{token}` |
 | `GET /v1/headless/categories` | `headless.tebex.io/api/accounts/{token}/categories` |
@@ -125,6 +127,8 @@ The sanitizer **never mutates** the upstream object — it returns a copy, so a 
 | `GET /v1/headless/packages/:id` | `headless.tebex.io/api/accounts/{token}/packages/:id` |
 | `GET /v1/checkout/payments/:txnId` | `checkout.tebex.io/api/payments/:txnId` (PII stripped) |
 | `GET /v1/checkout/validate` | `checkout.tebex.io/api/payments/tbx-validation-test` |
+
+Every id taken from the path (`:id`, `:userId`, `:packageId`, `:transaction`, `:txnId`) must match `[A-Za-z0-9_-]{1,64}`; anything else is refused with a 400 and never reaches Tebex. Any other route answers 404 with `{"error":"ROUTE_NOT_FOUND"}`, which Joely reports as "update your bridge". The same list lives in [`routes.json`](routes.json): the tests keep it in sync with `src/routes/`, and Joely checks its own calls against it.
 
 ## Keeping the bridge up to date
 

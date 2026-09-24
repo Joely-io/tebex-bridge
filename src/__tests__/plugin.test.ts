@@ -19,14 +19,19 @@ function buildApp() {
   return app
 }
 
-function signedGet(path: string, signature?: string) {
+function signedRequest(method: string, path: string, signature?: string) {
   const timestamp = Math.floor(Date.now() / 1000).toString()
   return buildApp().request(path, {
+    method,
     headers: {
       'X-Joely-Timestamp': timestamp,
-      'X-Joely-Signature': signature ?? computeSignature(SECRET, timestamp, 'GET', path, ''),
+      'X-Joely-Signature': signature ?? computeSignature(SECRET, timestamp, method, path, ''),
     },
   })
+}
+
+function signedGet(path: string, signature?: string) {
+  return signedRequest('GET', path, signature)
 }
 
 function mockTebex(response: () => Response) {
@@ -136,5 +141,88 @@ describe('GET /v1/plugin/payments/:transaction', () => {
     const res = await signedGet('/v1/plugin/payments/fields/5')
     expect(res.status).toBe(200)
     expect(fetchMock.mock.calls[0][0]).toBe('https://plugin.tebex.io/payments/fields/5')
+  })
+})
+
+describe.each([
+  ['coupons', 'couponId', '/v1/plugin/coupons', 'https://plugin.tebex.io/coupons'],
+  ['gift-cards', 'giftCardId', '/v1/plugin/gift-cards', 'https://plugin.tebex.io/gift-cards'],
+])('DELETE /v1/plugin/%s/:%s', (_resource, _param, route, tebexUrl) => {
+  afterEach(() => {
+    globalThis.fetch = realFetch
+  })
+
+  it('proxies a signed DELETE to Tebex with the bridge secret', async () => {
+    const fetchMock = mockTebex(() => new Response(null, { status: 204 }))
+
+    const res = await signedRequest('DELETE', `${route}/12345`)
+
+    expect(res.status).toBe(204)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe(`${tebexUrl}/12345`)
+    expect(init?.method).toBe('DELETE')
+    expect((init?.headers as Record<string, string>)['X-Tebex-Secret']).toBe('test-game-secret')
+  })
+
+  it('passes the Tebex response body through (a voided gift card is echoed back)', async () => {
+    const body = '{"data":{"id":12345,"void":true}}'
+    mockTebex(() => new Response(body, { status: 200, headers: { 'content-type': 'application/json' } }))
+    const res = await signedRequest('DELETE', `${route}/12345`)
+    expect(res.status).toBe(200)
+    expect(await res.text()).toBe(body)
+  })
+
+  it('passes a Tebex 404 through with its JSON body, never as a missing route', async () => {
+    mockTebex(() => new Response('{"error_code":404,"error_message":"Not found"}', { status: 404 }))
+    const res = await signedRequest('DELETE', `${route}/12345`)
+    expect(res.status).toBe(404)
+    expect(await res.json()).toEqual({ error_code: 404, error_message: 'Not found' })
+  })
+
+  it('rejects an unsigned DELETE before calling Tebex', async () => {
+    const fetchMock = mockTebex(() => new Response(null, { status: 204 }))
+    const res = await buildApp().request(`${route}/12345`, { method: 'DELETE' })
+    expect(res.status).toBe(401)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['a path traversal', '..%2Finformation'],
+    ['a dot', '12.345'],
+    ['a space', '12%20345'],
+    ['more than 64 characters', 'x'.repeat(65)],
+  ])('refuses %s in the id with 400, without calling Tebex', async (_label, id) => {
+    const fetchMock = mockTebex(() => new Response(null, { status: 204 }))
+    const res = await signedRequest('DELETE', `${route}/${id}`)
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ error: 'INVALID_ID' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('id validation on the other Plugin routes', () => {
+  afterEach(() => {
+    globalThis.fetch = realFetch
+  })
+
+  it.each([
+    '/v1/plugin/user/..%2Finformation',
+    '/v1/plugin/coupons/..%2Finformation',
+    '/v1/plugin/gift-cards/..%2Finformation',
+    '/v1/plugin/payments/fields/..%2Finformation',
+  ])('refuses a path traversal id on GET %s with 400', async (path) => {
+    const fetchMock = mockTebex(() => new Response('{}', { status: 200 }))
+    const res = await signedGet(path)
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ error: 'INVALID_ID' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('still proxies a valid numeric user id', async () => {
+    const fetchMock = mockTebex(() => new Response('{"payments":[]}', { status: 200 }))
+    const res = await signedGet('/v1/plugin/user/1234567')
+    expect(res.status).toBe(200)
+    expect(fetchMock.mock.calls[0][0]).toBe('https://plugin.tebex.io/user/1234567')
   })
 })

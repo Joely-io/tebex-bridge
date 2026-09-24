@@ -16,7 +16,14 @@
     { "method": "GET", "path": "/v1/headless/categories" },
     { "method": "GET", "path": "/v1/headless/packages" },
     { "method": "GET", "path": "/v1/headless/packages/:packageId" },
+    { "method": "POST", "path": "/v1/headless/baskets" },
+    { "method": "GET", "path": "/v1/headless/baskets/:ident" },
+    { "method": "GET", "path": "/v1/headless/baskets/:ident/auth" },
+    { "method": "POST", "path": "/v1/headless/baskets/:ident/packages" },
+    { "method": "POST", "path": "/v1/headless/baskets/:ident/packages/remove" },
     { "method": "GET", "path": "/v1/checkout/payments/:txnId" },
-    { "method": "GET", "path": "/v1/checkout/validate" }
+    { "method": "GET", "path": "/v1/checkout/validate" },
+    { "method": "GET", "path": "/v1/checkout/baskets/:ident" },
+    { "method": "POST", "path": "/v1/checkout/baskets/:ident/sales" }
   ]
 }

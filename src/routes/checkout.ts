@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { config } from '../config.js'
 import { validateIdParam } from '../utils/params.js'
 import { proxyToTebex } from '../utils/proxy.js'
-import { sanitizePayment } from '../utils/sanitize.js'
+import { sanitizeCheckoutBasket, sanitizePayment } from '../utils/sanitize.js'
 import {
   TEBEX_CHECKOUT_API_BASE,
   TEBEX_CHECKOUT_VALIDATION_URL,
@@ -14,10 +14,12 @@ import {
  * Auth: HTTP Basic ({storeId}:{privateKey}) — the private key comes from the
  * bridge's own env, the store ID is resolved from the Headless API at startup.
  *
- * Used by Joely for: transaction/payment details, credential validation.
+ * Used by Joely for: transaction/payment details, credential validation, and
+ * the baskets behind payment links (payment proof, percentage sale).
  * Payment responses are sanitized: the customer object is reduced to the
  * webstore username and gift-recipient usernames are stripped before the
- * response leaves this bridge (see utils/sanitize.ts).
+ * response leaves this bridge. Basket responses are reduced to an allowlist
+ * (see utils/sanitize.ts).
  */
 export const checkout = new Hono()
 
@@ -65,5 +67,23 @@ checkout.get('/payments/:txnId', validateIdParam('txnId', 'INVALID_TRANSACTION_I
 checkout.get('/validate', (c) =>
   proxyToTebex(c, TEBEX_CHECKOUT_VALIDATION_URL, {
     headers: checkoutHeaders(),
+  })
+)
+
+// GET /v1/checkout/baskets/:ident — payment proof of a basket (complete, payment status, payment link)
+checkout.get('/baskets/:ident', validateIdParam('ident'), (c) =>
+  proxyToTebex(c, `${TEBEX_CHECKOUT_API_BASE}/baskets/${encodeURIComponent(c.req.param('ident'))}`, {
+    headers: checkoutHeaders(),
+    transform: sanitizeCheckoutBasket,
+  })
+)
+
+// POST /v1/checkout/baskets/:ident/sales — apply a percentage sale to a basket
+checkout.post('/baskets/:ident/sales', validateIdParam('ident'), async (c) =>
+  proxyToTebex(c, `${TEBEX_CHECKOUT_API_BASE}/baskets/${encodeURIComponent(c.req.param('ident'))}/sales`, {
+    method: 'POST',
+    headers: { ...checkoutHeaders(), 'Content-Type': 'application/json' },
+    body: await c.req.text(),
+    transform: sanitizeCheckoutBasket,
   })
 )

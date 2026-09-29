@@ -128,7 +128,7 @@ The sanitizer **never mutates** the upstream object — it returns a copy, so a 
 
 ## Keeping the bridge up to date
 
-When Joely adds new Tebex features, your bridge may need an update to expose the new routes. Joely will surface a clear error if a feature requires a newer bridge version. Update with:
+When Joely adds new Tebex features, your bridge may need an update to expose the new routes. Joely checks your bridge version on the dashboard and prompts members who manage your Tebex stores to update when it falls below the minimum version it needs; the Tebex settings page shows each bridge's version and status. Update with:
 
 ```bash
 git pull && pnpm install && pnpm build && pnpm start

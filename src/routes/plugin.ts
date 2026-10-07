@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { config } from '../config.js'
 import { validateIdParam } from '../utils/params.js'
 import { proxyToTebex } from '../utils/proxy.js'
-import { sanitizePluginPayment, sanitizeUserLookup } from '../utils/sanitize.js'
+import { sanitizePlayerPackages, sanitizePluginPayment, sanitizeUserLookup } from '../utils/sanitize.js'
 import { TEBEX_PLUGIN_API_BASE, pluginHeaders as buildPluginHeaders } from '../utils/tebex.js'
 
 /**
@@ -48,6 +48,16 @@ plugin.get('/user/:userId', validateIdParam('userId'), (c) =>
     headers: pluginHeaders(),
     transform: sanitizeUserLookup,
   })
+)
+
+// GET /v1/plugin/player/:playerId/packages — a player's active packages, the
+// purchase history of a store below Tebex's Plus plan (which refuses /user)
+plugin.get('/player/:playerId/packages', validateIdParam('playerId'), (c) =>
+  proxyToTebex(
+    c,
+    `${TEBEX_PLUGIN_API_BASE}/player/${encodeURIComponent(c.req.param('playerId'))}/packages`,
+    { headers: pluginHeaders(), transform: sanitizePlayerPackages }
+  )
 )
 
 // POST /v1/plugin/coupons — create coupon

@@ -82,6 +82,13 @@ The bridge is a proxy: it forwards Tebex's responses to Joely. On the routes tha
 | `payments[]` (txn id, time, price, currency, status) | ✅ kept |
 | `player` (player profile), `banCount`, `chargebackRate`, `purchaseTotals` | ❌ stripped |
 
+**`GET /v1/plugin/player/:playerId/packages`** (Plugin API: the purchase history of a store below Tebex's Plus plan, which refuses the user lookup above), sanitized by `sanitizePlayerPackages()`:
+
+| Tebex field | Sent to Joely? |
+|-------------|----------------|
+| `txn_id`, `date`, `quantity`, `package.id`, `package.name` | ✅ kept |
+| everything else | ❌ stripped |
+
 **`GET /v1/plugin/payments/:transaction`** (Plugin API: payment by transaction id, fallback when the Checkout API cannot find it), sanitized by `sanitizePluginPayment()`:
 
 | Tebex field | Sent to Joely? |
@@ -116,7 +123,7 @@ The sanitizer **never mutates** the upstream object — it returns a copy, so a 
 
 - Every request from Joely is signed with **HMAC-SHA256** over `timestamp + method + path + body-hash`, with a 5-minute anti-replay window
 - Signatures are compared in constant time
-- The bridge exposes **only** the 26 routes Joely needs (see `src/routes/`); everything else is 404
+- The bridge exposes **only** the 27 routes Joely needs (see `src/routes/`); everything else is 404
 - Customer PII is stripped before responses leave the bridge — see [What the bridge sends to Joely](#what-the-bridge-sends-to-joely) above and `src/utils/sanitize.ts`
 - The bridge never logs request bodies, headers, or key material — only `METHOD /path -> status`
 
@@ -128,6 +135,7 @@ The sanitizer **never mutates** the upstream object — it returns a copy, so a 
 | `GET /v1/auth-check` | — (signed; verifies the shared secret and reports the startup key check as `keys: { public, private, game }` booleans) |
 | `GET /v1/plugin/information` | `plugin.tebex.io/information` |
 | `GET /v1/plugin/user/:userId` | `plugin.tebex.io/user/:userId` (PII stripped) |
+| `GET /v1/plugin/player/:playerId/packages` | `plugin.tebex.io/player/:playerId/packages` (purchase history below Tebex Plus, PII stripped) |
 | `POST /v1/plugin/coupons` | `plugin.tebex.io/coupons` |
 | `GET /v1/plugin/coupons/:id` | `plugin.tebex.io/coupons/:id` |
 | `DELETE /v1/plugin/coupons/:id` | `plugin.tebex.io/coupons/:id` (revoke a coupon) |
@@ -151,7 +159,7 @@ The sanitizer **never mutates** the upstream object — it returns a copy, so a 
 | `GET /v1/checkout/baskets/:ident` | `checkout.tebex.io/api/baskets/:ident` (payment proof only) |
 | `POST /v1/checkout/baskets/:ident/sales` | `checkout.tebex.io/api/baskets/:ident/sales` (payment proof only) |
 
-Every id taken from the path (`:id`, `:userId`, `:packageId`, `:transaction`, `:txnId`, `:ident`) must match `[A-Za-z0-9_-]{1,64}`; anything else is refused with a 400 and never reaches Tebex. Any other route answers 404 with `{"error":"ROUTE_NOT_FOUND"}`, which Joely reports as "update your bridge". The same list lives in [`routes.json`](routes.json): the tests keep it in sync with `src/routes/`, and Joely checks its own calls against it.
+Every id taken from the path (`:id`, `:userId`, `:playerId`, `:packageId`, `:transaction`, `:txnId`, `:ident`) must match `[A-Za-z0-9_-]{1,64}`; anything else is refused with a 400 and never reaches Tebex. Any other route answers 404 with `{"error":"ROUTE_NOT_FOUND"}`, which Joely reports as "update your bridge". The same list lives in [`routes.json`](routes.json): the tests keep it in sync with `src/routes/`, and Joely checks its own calls against it.
 
 ## Keeping the bridge up to date
 

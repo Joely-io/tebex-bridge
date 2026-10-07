@@ -3,6 +3,7 @@
   "routes": [
     { "method": "GET", "path": "/v1/plugin/information" },
     { "method": "GET", "path": "/v1/plugin/user/:userId" },
+    { "method": "GET", "path": "/v1/plugin/player/:playerId/packages" },
     { "method": "POST", "path": "/v1/plugin/coupons" },
     { "method": "GET", "path": "/v1/plugin/coupons/:couponId" },
     { "method": "DELETE", "path": "/v1/plugin/coupons/:couponId" },

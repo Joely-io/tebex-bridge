@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sanitizePayment, sanitizePluginPayment, sanitizeUserLookup } from '../utils/sanitize.js'
+import { sanitizePayment, sanitizePlayerPackages, sanitizePluginPayment, sanitizeUserLookup } from '../utils/sanitize.js'
 
 describe('sanitizePayment', () => {
   it('reduces customer to the webstore username only', () => {
@@ -171,5 +171,34 @@ describe('sanitizePluginPayment', () => {
   it('handles non-object responses', () => {
     expect(sanitizePluginPayment(null)).toBeNull()
     expect(sanitizePluginPayment([1, 2])).toEqual([1, 2])
+  })
+})
+
+describe('sanitizePlayerPackages', () => {
+  it('keeps txn_id, date, quantity and package id + name only', () => {
+    const rows = [
+      {
+        txn_id: 'tbx-1',
+        date: '2026-01-31T01:00:00+00:00',
+        quantity: 2,
+        package: { id: 5, name: 'VIP', image: 'https://x/vip.png' },
+        player: { name: 'buyer_ign', uuid: '76561198000000000' },
+      },
+    ]
+
+    expect(sanitizePlayerPackages(rows)).toEqual([
+      { txn_id: 'tbx-1', date: '2026-01-31T01:00:00+00:00', quantity: 2, package: { id: 5, name: 'VIP' } },
+    ])
+  })
+
+  it('does not mutate the original rows', () => {
+    const rows = [{ txn_id: 'tbx-1', package: { id: 5, name: 'VIP', image: 'x' } }]
+    sanitizePlayerPackages(rows)
+    expect(rows[0].package.image).toBe('x')
+  })
+
+  it('passes a non-array body through unchanged', () => {
+    expect(sanitizePlayerPackages(null)).toBeNull()
+    expect(sanitizePlayerPackages({ error_message: 'x' })).toEqual({ error_message: 'x' })
   })
 })

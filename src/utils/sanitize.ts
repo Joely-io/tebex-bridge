@@ -187,3 +187,25 @@ export function sanitizeCheckoutBasket(body: unknown): unknown {
     return result
   })
 }
+
+/** Player package row fields Joely reads (`GET /player/:id/packages`) */
+const PLAYER_PACKAGE_FIELDS = ['txn_id', 'date', 'quantity', 'package'] as const
+
+/**
+ * Reduce a Plugin API player packages response (GET /player/:id/packages, the
+ * purchase history of a store below Tebex's Plus plan) to an allowlist: each
+ * row keeps `txn_id`, `date`, `quantity` and `package.{id,name}`. Returns a
+ * copy; a non-array body passes through unchanged.
+ */
+export function sanitizePlayerPackages(rows: unknown): unknown {
+  if (!Array.isArray(rows)) {
+    return rows
+  }
+  return rows.map((row) => {
+    const result = pick(row, PLAYER_PACKAGE_FIELDS)
+    if (isPlainObject(result) && 'package' in result) {
+      result.package = pick(result.package, ['id', 'name'])
+    }
+    return result
+  })
+}

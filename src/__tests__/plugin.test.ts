@@ -226,3 +226,52 @@ describe('id validation on the other Plugin routes', () => {
     expect(fetchMock.mock.calls[0][0]).toBe('https://plugin.tebex.io/user/1234567')
   })
 })
+
+describe('GET /v1/plugin/player/:playerId/packages', () => {
+  afterEach(() => {
+    globalThis.fetch = realFetch
+  })
+
+  it('proxies a signed request and keeps only what Joely reads', async () => {
+    const fetchMock = mockTebex(
+      () =>
+        new Response(
+          JSON.stringify([
+            {
+              txn_id: 'tbx-1',
+              date: '2026-01-31T01:00:00+00:00',
+              quantity: 1,
+              package: { id: 5, name: 'VIP', image: 'https://x/vip.png' },
+              player: { name: 'buyer_ign', uuid: '76561198000000000' },
+            },
+          ]),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        )
+    )
+
+    const res = await signedGet('/v1/plugin/player/28400/packages')
+
+    expect(res.status).toBe(200)
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://plugin.tebex.io/player/28400/packages')
+    expect((init?.headers as Record<string, string>)['X-Tebex-Secret']).toBe('test-game-secret')
+    expect(await res.json()).toEqual([
+      { txn_id: 'tbx-1', date: '2026-01-31T01:00:00+00:00', quantity: 1, package: { id: 5, name: 'VIP' } },
+    ])
+  })
+
+  it('passes a Tebex error through with its body', async () => {
+    mockTebex(() => new Response('{"error_message":"Not found"}', { status: 404 }))
+    const res = await signedGet('/v1/plugin/player/28400/packages')
+    expect(res.status).toBe(404)
+    expect(await res.json()).toEqual({ error_message: 'Not found' })
+  })
+
+  it('refuses a path traversal id with 400, without calling Tebex', async () => {
+    const fetchMock = mockTebex(() => new Response('[]', { status: 200 }))
+    const res = await signedGet('/v1/plugin/player/..%2Finformation/packages')
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ error: 'INVALID_ID' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})

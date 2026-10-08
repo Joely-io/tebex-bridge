@@ -85,7 +85,39 @@ describe('Headless basket routes', () => {
     expect(init?.method).toBe('POST')
     expect(init?.body).toBe(body)
     expect((init?.headers as Record<string, string>)['Content-Type']).toBe('application/json')
+    expect((init?.headers as Record<string, string>).Authorization).toBeUndefined()
     expect(await res.json()).toEqual(SANITIZED_HEADLESS_BASKET)
+  })
+
+  it('POST /v1/headless/baskets forwards the buyer IP with Headless Basic auth (public key : private key)', async () => {
+    const fetchMock = mockTebex(200, HEADLESS_BASKET)
+    const body = JSON.stringify({ complete_url: 'https://joely.io/done', ip_address: '203.0.113.7' })
+
+    const res = await signedRequest('POST', '/v1/headless/baskets', body)
+
+    expect(res.status).toBe(200)
+    const init = fetchMock.mock.calls[0][1]
+    expect(init?.body).toBe(body)
+    const expected = `Basic ${Buffer.from('test-public-key:test-private-key').toString('base64')}`
+    expect((init?.headers as Record<string, string>).Authorization).toBe(expected)
+  })
+
+  it('POST /v1/headless/baskets drops the buyer IP without a private key (Tebex refuses it unauthenticated)', async () => {
+    const privateKey = config.privateKey
+    config.privateKey = null
+    try {
+      const fetchMock = mockTebex(200, HEADLESS_BASKET)
+      const body = JSON.stringify({ complete_url: 'https://joely.io/done', ip_address: '203.0.113.7' })
+
+      const res = await signedRequest('POST', '/v1/headless/baskets', body)
+
+      expect(res.status).toBe(200)
+      const init = fetchMock.mock.calls[0][1]
+      expect(JSON.parse(init?.body as string)).toEqual({ complete_url: 'https://joely.io/done' })
+      expect((init?.headers as Record<string, string>).Authorization).toBeUndefined()
+    } finally {
+      config.privateKey = privateKey
+    }
   })
 
   it('GET /v1/headless/baskets/:ident reads the basket and strips buyer PII', async () => {

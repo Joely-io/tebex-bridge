@@ -3,7 +3,7 @@ import { config } from '../config.js'
 import { validateIdParam } from '../utils/params.js'
 import { proxyToTebex } from '../utils/proxy.js'
 import { sanitizeHeadlessBasket } from '../utils/sanitize.js'
-import { TEBEX_HEADLESS_API_BASE, headlessAccountBase } from '../utils/tebex.js'
+import { JSON_HEADERS, TEBEX_HEADLESS_API_BASE, basketCreationRequest, headlessAccountBase } from '../utils/tebex.js'
 
 /**
  * Headless API routes (https://docs.tebex.io/developers)
@@ -40,17 +40,16 @@ headless.get('/packages/:packageId', validateIdParam('packageId'), (c) =>
   proxyToTebex(c, `${accountBase()}/packages/${encodeURIComponent(c.req.param('packageId'))}`)
 )
 
-const JSON_HEADERS = { 'Content-Type': 'application/json' }
-
-// POST /v1/headless/baskets — create a basket (payment links)
-headless.post('/baskets', async (c) =>
-  proxyToTebex(c, `${accountBase()}/baskets`, {
+// POST /v1/headless/baskets — create a basket (payment links, buyer IP: see basketCreationRequest)
+headless.post('/baskets', async (c) => {
+  const { body, headers } = basketCreationRequest(await c.req.text(), config.publicKey, config.privateKey)
+  return proxyToTebex(c, `${accountBase()}/baskets`, {
     method: 'POST',
-    headers: JSON_HEADERS,
-    body: await c.req.text(),
+    headers,
+    body,
     transform: sanitizeHeadlessBasket,
   })
-)
+})
 
 // GET /v1/headless/baskets/:ident — basket state (completion, Cfx.re identity, packages)
 headless.get('/baskets/:ident', validateIdParam('ident'), (c) =>

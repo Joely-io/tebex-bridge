@@ -25,7 +25,7 @@ cp .env.example .env
 | `TEBEX_PUBLIC_KEY` | Yes | Headless API — store info, categories, packages |
 | `JOELY_SHARED_SECRET` | Yes | HMAC secret, generated in the Joely dashboard |
 | `TEBEX_GAME_SERVER_SECRET_KEY` | No | Plugin API — payment lookup, coupons, gift cards, manual payments |
-| `TEBEX_PRIVATE_KEY` | No | Checkout API — transaction details (the store ID is resolved automatically from your public key) |
+| `TEBEX_PRIVATE_KEY` | No | Checkout API — transaction details (the store ID is resolved automatically from your public key). Also authenticates payment link basket creation so Tebex taxes the buyer's country: without it, the buyer IP is dropped and Tebex attributes the basket to the bridge's IP |
 | `PORT` | No | Listen port (default 3000) |
 
 Optional keys only disable their feature: without `TEBEX_GAME_SERVER_SECRET_KEY`, coupon / gift-card / manual-payment features simply won't work in Joely.
